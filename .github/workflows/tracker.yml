@@ -1,0 +1,33 @@
+name: GitHub Projects Automation
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  move-issue-to-done:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Mark linked issues as done
+        if: github.event.pull_request.merged == true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "PR #$PR_NUMBER was merged."
+          ISSUES=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json closingIssuesReferences --jq '.closingIssuesReferences[].number')
+          if [ -z "$ISSUES" ]; then
+            echo "No linked issues found."
+            exit 0
+          fi
+          for n in $ISSUES; do
+            echo "Issue #$n is linked to this PR. The project board will move it to Done."
+            gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "PR #$PR_NUMBER has been merged. This task is now Done."
+          done
